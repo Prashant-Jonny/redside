@@ -1,0 +1,23 @@
+# Hostname or IP address to use for communication (leave blank to listen on all interfaces)
+listen_address:
+
+# TCP port to use for communication
+# This *has* to be 2106, so leave this alone for now.
+listen_port: 2106
+
+# Network I/O type
+# Possible values are:
+#   select - uses native select()
+#   thread - uses 1:1 thread per socket
+#   event - uses EventMachine if available
+# JRuby is recommended if using "thread"
+# "select" or "event" is recommended otherwise
+# Note: Only "thread" is supported at the moment
+io_type: thread
+
+# Set this option to "true" to enable debugging or
+# "false" to disable debugging.
+# This option should NOT be enabled on a production
+# server since it may induce a crash if certain
+# exceptions are encountered!
+debug_mode: true

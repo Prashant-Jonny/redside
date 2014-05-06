@@ -1,0 +1,40 @@
+# Name of your server
+server_name: Pride
+
+# Name of the server administrator
+server_admin: John Dough
+
+# Contact e-mail address
+contact_email: segs@nemerle.eu
+
+# Contact URL
+contact_link: http://segs.nemerle.eu/
+
+# Hostname or IP address to use for communication (leave blank to listen on all interfaces)
+listen_address:
+
+# TCP port to use for communication
+listen_port: 7002
+
+# Address clients will receive data from (should be your external IP address if using NAT)
+location_addr: 127.0.0.1
+
+# Maximum number of players allowed on the server simultaneously
+max_players: 128
+
+# Network I/O type
+# Possible values are:
+#   select - uses native select()
+#   thread - uses 1:1 thread per socket
+#   event - uses EventMachine if available
+# JRuby is recommended if using "thread"
+# "select" or "event" is recommended otherwise
+# Note: Only "thread" is supported at the moment
+io_type: thread
+
+# Set this option to "true" to enable debugging or
+# "false" to disable debugging.
+# This option should NOT be enabled on a production
+# server since it may induce a crash if certain
+# exceptions are encountered!
+debug_mode: true
