@@ -1,7 +1,11 @@
-class BitStream 
+require_relative 'growingbuffer'
+class BitStream < GrowingBuffer
   attr_reader :m_byteAligned, :m_read_bit_off, :m_write_bit_off
 
-  def initialize(stream)    
+  def initialize(src=nil)
+    reset()
+    super(src)
+    @m_byte_aligned = false
   end
 
   def store_bits(nBits, dataBits) 
@@ -116,7 +120,7 @@ class BitStream
   # Retrieves a null-terminated C-style string from the bit stream
   def get_string(str)
     if get_readable_bits() < 8
-      m_last_err = 1
+      @m_last_err = 1
       return
     end
 
@@ -125,15 +129,15 @@ class BitStream
     chr = nil
 
     begin
-      chr = m_buf[m_read_off] >> m_read_bit_off # will need to look at this line and the one below since ruby
-      chr |= m_buf[++m_read_off] << bitsLeft    # lacks support for the prefix operator and verify syntax of []
+      chr = @m_buf[@m_read_off] >> @m_read_bit_off # will need to look at this line and the one below since ruby
+      chr |= @m_buf[++@m_read_off] << bitsLeft    # lacks support for the prefix operator and verify syntax of []
 
       if chr
         str += chr
       end
 
       if chr != '\0' && get_readable_bits() < 8
-        m_last_err = 1
+        @m_last_err = 1
         return
       end
     end while chr != '\0'
@@ -182,15 +186,15 @@ class BitStream
   end
 
   def get_writable_bits()
-    return (getAvailSize() << 3) - m_write_bit_off
+    return (getAvailSize() << 3) - @m_write_bit_off
   end
 
   def get_readable_bits()
-    return (get_readable_data_size() << 3) + (m_write_bit_off - m_read_bit_off)
+    return (get_readable_data_size() << 3) + (@m_write_bit_off - @m_read_bit_off)
   end
 
   def get_avail_size()
-    res = (m_size - m_write_off) - (m_write_bit_off != 0)
+    res = (@m_size - @m_write_off) - (@m_write_bit_off != 0)
     return [0, res].max
   end
 
@@ -213,8 +217,8 @@ class BitStream
   end
 
   def use_byte_aligned_mode(toggle)
-    m_byte_aligned = toggle
-    if m_byte_aligned
+    @m_byte_aligned = toggle
+    if @m_byte_aligned
       byte_align()
     end
   end
@@ -222,19 +226,19 @@ class BitStream
   def byte_align(read_part = true, write_part = true)
     # If bit_pos is 0, we're already aligned
     if write_part
-      m_write_off += (m_write_bit_off > 0)
-      m_write_bit_off = 0
+      @m_write_off += (@m_write_bit_off > 0)
+      @m_write_bit_off = 0
     end
 
     if read_part
-      m_read_off += (m_read_bit_off > 0)
-      m_read_bit_off = 0
+      @m_read_off += (@m_read_bit_off > 0)
+      @m_read_bit_off = 0
     end
   end
 
   def reset()
-    GrowingBuffer.reset();
-    m_write_bit_off = m_read_bit_off = 0
+    super
+    @m_write_bit_off = @m_read_bit_off = 0
   end
 
   def get_packed_bits_length(nbits, data_bits)
@@ -257,6 +261,8 @@ class BitStream
   end
 
   def get_bits_length(nbits, data_bits)
+=begin
+    UNUSED METHOD
     # If this stream is byte aligned, then we'll need to use a byte-aligned
     # value for nbits
     num_bits = is_byte_aligned() ? byte_align(nbits) : nbits
@@ -275,6 +281,7 @@ class BitStream
     end
 
     return bits_added
+=end
   end
 
   def set_byte_length(byte_len)
