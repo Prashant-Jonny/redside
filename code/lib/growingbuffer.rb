@@ -13,6 +13,7 @@ class GrowingBuffer
     @m_read_off = 0
     @m_write_off = 0
     @m_write_off = dat.size() if( not dat.nil?)
+    @m_size = @m_write_off
   end
   def get_readable_data_size
     @m_write_off - @m_read_off

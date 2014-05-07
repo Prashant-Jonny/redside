@@ -1,5 +1,7 @@
 require_relative 'growingbuffer'
 class BitStream < GrowingBuffer
+  BITS_PER_BYTE = 8
+  BITS_PER_DWORD = 32
   attr_reader :m_byteAligned, :m_read_bit_off, :m_write_bit_off
 
   def initialize(src=nil)
@@ -8,8 +10,26 @@ class BitStream < GrowingBuffer
     @m_byte_aligned = false
   end
 
-  def store_bits(nBits, dataBits) 
-    raise NotImplementedError.new()
+  def store_bits(num_bits, data_bits) 
+    raise RuntimeError.new if (num_bits > BITS_PER_DWORD)
+
+    if(num_bits>get_writable_bits())
+      new_size = @m_size+(num_bits>>3)
+      # growing to accommodate !
+      if(resize(new_size+7)==-1)
+        @m_last_err = 1;
+        return
+      end
+    end
+    #  If this stream is byte-aligned, then we'll need to use a byte-aligned
+    #  value for nBits
+    if(is_byte_aligned)
+        if(num_bits) # mask out non-needed
+            data_bits &= (1<<num_bits)-1
+        end
+        num_bits = BYTE_ALIGN(num_bits)
+    end
+    uStoreBits(num_bits,data_bits)
   end
 
   def u_store_bits(nBits, dataBits)
@@ -27,7 +47,8 @@ class BitStream < GrowingBuffer
   def store_float_with_debug_info(val)
     raise NotImplementedError.new()
   end
-
+  # packed bits handle any value, nBits is just a hint 
+  # as to how many bits the encoding of dataBits needs
   def store_packed_bits(nBits, dataBits)
     raise NotImplementedError.new()
   end
@@ -186,7 +207,7 @@ class BitStream < GrowingBuffer
   end
 
   def get_writable_bits()
-    return (getAvailSize() << 3) - @m_write_bit_off
+    return (get_avail_size() << 3) - @m_write_bit_off
   end
 
   def get_readable_bits()

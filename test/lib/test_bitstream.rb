@@ -25,5 +25,10 @@ class TestBitStream < Test::Unit::TestCase
     bs.store_bits(2,1)
     assert_equal(bs.get_bits(2), 1 )
   end
- 
+  def test_packed_bits
+    bs = BitStream.new("")
+    
+    bs.store_packed_bits(3, 11)
+    assert_equal(bs.get_packed_bits(3), 11 )
+  end
 end
