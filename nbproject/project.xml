@@ -6,11 +6,10 @@
             <name>RedSide</name>
             <source-roots>
                 <root id="src.dir"/>
-                <root id="lib.dir"/>
-                <root id="projects.dir"/>
             </source-roots>
             <test-roots>
-                <root id="test.tests.dir"/>
+                <root id="test.src.dir"/>
+                <root id="spec.src.dir"/>
             </test-roots>
         </data>
     </configuration>
