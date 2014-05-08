@@ -29,8 +29,6 @@ class BitStream < GrowingBuffer
   # least significant bit to the most significant bit.
   def store_bits(num_bits, data_bits)
     raise RuntimeError.new if (num_bits > BITS_PER_DWORD)
-puts "!!!!!"
-puts num_bits
     if num_bits > get_writable_bits()
       new_size = @m_size + (num_bits >> 3)
       # growing to accommodate!
@@ -50,16 +48,28 @@ puts num_bits
     end
     u_store_bits(num_bits, data_bits)
   end
-
+private
+  def read_8bytes_at_point(pt)
+    raise RuntimeError.new(Out of bounds read) if pt+7 > @m_size
+    @m_buf[pt..pt+7].unpack("Q")[0]
+  end
+  def set_8bytes_at_write_point(val)
+    raise RuntimeError.new(Out of bounds read) if @m_write_off+7 > @m_size
+    @m_buf[@m_write_off..@m_write_off+7] = [val.to_i].pack("Q")
+  end
+  def BIT_MASK(x)
+    (((1 << (x)) - 1))&0xFFFFFFFF
+  end
+public
   def u_store_bits(nbits, data_bits)
     tp = nil
     r = nil
     raise "nbits is > 32!" unless nbits <= 32
     raise "m_write_off + 7 is > (m_size + m_safe_area)!" unless @m_write_off + 7 < (@m_size + @m_safe_area)
-    tp = write_ptr()
+    tp = read_8bytes_at_point(@m_write_off)
     r = data_bits
     mask_ = BIT_MASK(nbits) << @m_write_bit_off  # all bits in the mask are those that will change
-    tp = (r << @m_write_bit_off) | (tp & ~mask_) # put those bits in
+    set_8bytes_at_write_point((r << @m_write_bit_off) | (tp & ~mask_) )# put those bits in
     write_ptr((@m_write_bit_off + nbits) >> 3)   # advance
     @m_write_bit_off = (@m_write_bit_off + nbits) & 0x7
   end
@@ -210,7 +220,7 @@ puts num_bits
     raise "get_readable_bits() returned < nbits!" unless get_readable_bits() >= nbits
     raise "m_read_off + 7 is > (m_size + m_safe_area)!" unless @m_read_off + 7 < (@m_size + @m_safe_area)
     nbits = ((nbits - 1) &0x1F) + 1 # ensure the nbits range is 1 - 32
-    tp = read_ptr()
+    tp = read_8bytes_at_point(@m_read_off)
     r = tp
     r >>= @m_read_bit_off             # starting at the top
     target = r & (~1) >> (64 - nbits)
@@ -391,12 +401,12 @@ puts num_bits
   def byte_align(read_part = true, write_part = true)
     # If bit_pos is 0, we're already aligned
     if write_part
-      @m_write_off += (@m_write_bit_off > 0)
+      @m_write_off += (@m_write_bit_off > 0) ? 1 : 0
       @m_write_bit_off = 0
     end
 
     if read_part
-      @m_read_off += (@m_read_bit_off > 0)
+      @m_read_off += (@m_read_bit_off > 0) ? 1 : 0
       @m_read_bit_off = 0
     end
   end

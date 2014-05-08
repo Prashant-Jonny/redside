@@ -64,20 +64,21 @@ class GrowingBuffer
     end
 
     if new_size > @m_size
-      tmp = Array.new[new_size + @m_safe_area]
-      if tmp == nil
-        return -2
-      end
-
       raise "m_write_off is > m_size!" unless @m_write_off <= @m_size # just to be sure
 
-      if @m_write_off > 1
-        tmp = @m_buf.dup # copying old contents (ToDo: copy up to @m_size)
-      end
-
-      @m_buf += Array.new(new_size + @m_safe_area - @m_size) { |i| 0 }
+      @m_buf += "\0" * (new_size + @m_safe_area - @m_size)
       @m_size = new_size
+    else
+      @m_buf = @m_buf.byteslice(new_size)
+      @m_size= new_size
     end
     return 0
   end
+  def write_ptr(v)
+    @m_write_off += v
+  end
+  def read_ptr(v)
+    @m_read_off += v
+  end
+
 end
