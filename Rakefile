@@ -4,7 +4,6 @@ require 'rake/testtask'
 require 'rspec/core/rake_task'
 require 'rdoc/task'
 
-
 Rake::TestTask.new do |t|
   t.libs << "code/lib"
   t.test_files = FileList['test/**/*.rb']

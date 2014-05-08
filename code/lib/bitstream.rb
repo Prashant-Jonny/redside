@@ -1,88 +1,230 @@
+# Super Entity Game Server
+# http://segs.nemerle.eu/
+# Copyright (c) 2014 Super Entity Game Server Team (see Authors.txt)
+# This software is licensed! (See LICENSE for details)
+
 require_relative 'growingbuffer'
+
 class BitStream < GrowingBuffer
   BITS_PER_BYTE = 8
   BITS_PER_DWORD = 32
-  attr_reader :m_byteAligned, :m_read_bit_off, :m_write_bit_off
+  attr_reader :m_byte_aligned, :m_read_bit_off, :m_write_bit_off
 
-  def initialize(src=nil)
+  def initialize(src = nil)
     reset()
     super(src)
     @m_byte_aligned = false
   end
 
-  def store_bits(num_bits, data_bits) 
-    raise RuntimeError.new if (num_bits > BITS_PER_DWORD)
+  def max_value_that_can_be_stored(x)
+    (1 << x) - 1
+  end
 
-    if(num_bits>get_writable_bits())
-      new_size = @m_size+(num_bits>>3)
-      # growing to accommodate !
-      if(resize(new_size+7)==-1)
-        @m_last_err = 1;
+  def n_ones(n)
+    (1 << n) - 1
+  end
+
+  # Stores a client-specified number of bits into the bit-stream buffer.
+  # The bits to store come from the data_bits argument, starting from the
+  # least significant bit to the most significant bit.
+  def store_bits(num_bits, data_bits)
+    raise RuntimeError.new if (num_bits > BITS_PER_DWORD)
+puts "!!!!!"
+puts num_bits
+    if num_bits > get_writable_bits()
+      new_size = @m_size + (num_bits >> 3)
+      # growing to accommodate!
+      if resize(new_size + 7) == -1
+        @m_last_err = 1
         return
       end
     end
-    #  If this stream is byte-aligned, then we'll need to use a byte-aligned
-    #  value for nBits
-    if(is_byte_aligned)
-        if(num_bits) # mask out non-needed
-            data_bits &= (1<<num_bits)-1
-        end
-        num_bits = BYTE_ALIGN(num_bits)
+
+    #  If this stream is byte aligned, then we will need to use a byte-aligned
+    #  value for nbits.
+    if is_byte_aligned()
+      if num_bits # mask out non-needed
+        data_bits &= (1 << num_bits) - 1
+      end
+      num_bits = BYTE_ALIGN(num_bits)
     end
-    uStoreBits(num_bits,data_bits)
+    u_store_bits(num_bits, data_bits)
   end
 
-  def u_store_bits(nBits, dataBits)
-    raise NotImplementedError.new()
+  def u_store_bits(nbits, data_bits)
+    tp = nil
+    r = nil
+    raise "nbits is > 32!" unless nbits <= 32
+    raise "m_write_off + 7 is > (m_size + m_safe_area)!" unless @m_write_off + 7 < (@m_size + @m_safe_area)
+    tp = write_ptr()
+    r = data_bits
+    mask_ = BIT_MASK(nbits) << @m_write_bit_off  # all bits in the mask are those that will change
+    tp = (r << @m_write_bit_off) | (tp & ~mask_) # put those bits in
+    write_ptr((@m_write_bit_off + nbits) >> 3)   # advance
+    @m_write_bit_off = (@m_write_bit_off + nbits) & 0x7
   end
 
-  def store_bits_with_debug_info(nBits, dataBits)
-    raise NotImplementedError.new()
+  # Stores a client-specified number of bits into the bit-stream buffer.
+  # The bits to store come from the data_bits argument, starting from the
+  # least significant bit to the most significant bit.
+  def store_bits_with_debug_info(nbits, data_bits)
+    store_bits(3, BS_BITS)
+    store_packed_bits(5, nbits)
+    store_bits(data_bits, nbits)
   end
 
   def store_float(val)
-    raise NotImplementedError.new()
+    if is_byte_aligned()
+      put(val)
+    else
+      store_bits(32, val)
+    end
   end
 
   def store_float_with_debug_info(val)
-    raise NotImplementedError.new()
-  end
-  # packed bits handle any value, nBits is just a hint 
-  # as to how many bits the encoding of dataBits needs
-  def store_packed_bits(nBits, dataBits)
-    raise NotImplementedError.new()
+    store_bits(3, BS_F32)
+    store_bits(5, 32)
+    store_bits(32, val)
   end
 
-  def store_packed_bits_with_debug_info(nBits, dataBits)
-    raise NotImplementedError.new()
+  # Packed bits handle any value. nbits is just a hint 
+  # as to how many bits the encoding of data_bits needs.
+  def store_packed_bits(nbits, data_bits)
+    if is_byte_aligned()
+      return store_bits(32, data_bits)
+    end
+
+    while (nbits < 32) && (data_bits >= max_value_that_can_be_stored(nbits))
+      data_bits -= max_value_that_can_be_stored(nbits)
+      store_bits(nbits, n_ones(nbits))
+      nbits = [nbits * 2, BITS_PER_DWORD].min
+    end
+
+    store_bits(nbits, data_bits)
   end
 
-  def store_bit_array(array,nBits)
-    raise NotImplementedError.new()
+  # Stores bits in a special "packed" format.
+  # ToDo: Develop a better understanding of this method.
+  def store_packed_bits_with_debug_info(nbits, data_bits)
+    store_bits(3, BS_PACKEDBITS)
+    store_packed_bits(5, nbits)
+    store_packed_bits(nbits, data_bits)
   end
 
-  def store_bit_array_with_debug_info(array,nBits)
-    raise NotImplementedError.new()
+  # Stores an array of bits in the bit stream buffer. The
+  # main difference between store_bit_array and store_bits
+  # is that store_bit_array can accept more than 32 bits at a time.
+  def store_bit_array(array, nbits)
+    nbytes = BITS_TO_BYTES(nbits)
+    raise "src is undefined!" unless src
+    byte_align()
+    put_bytes(src, nbytes)
+    @m_buf[@m_write_off] = 0
+
+    if nbits & 7 # unaligned !
+      @m_write_off -= 1
+      @m_write_bit_off = nbits & 7
+    end
   end
 
+  # Stores an array of bits in the bit stream buffer. The
+  # main difference between store_bit_array and store_bits
+  # is that store_bit_array can accept more than 32 bits at a time.
+  def store_bit_array_with_debug_info(array, nbits)
+    store_bits(3, BS_BITARRAY)
+    store_packed_bits(5, nbits)
+    store_bit_array(array, nbits)
+  end
+
+  # Stores a NULL-terminated C-style string in the bit stream
+  # buffer. It includes the NULL terminator.
   def store_string(str)
-    raise NotImplementedError.new()
+    if(!str) # nothing to do ?
+      return
+    end
+
+    # str.length + 1, because we want to include
+    # the NULL byte.
+    if is_byte_aligned()
+      put_string(str)
+      return
+    end
+
+    len = str.length + 1
+    rshift = 8 - @m_write_bit_off
+
+    if len > get_avail_size()
+      if resize(@m_write_off + len) == -1 # space exhausted
+        @m_last_err = 1
+        return
+      end
+    end
+
+    idx = 0
+    while idx < len do
+      upperbits = str[idx] << @m_write_bit_off
+      lowerbits = str[idx] >> rshift
+      mask = (0xFF >> rshift)
+      @m_buf[@m_write_off + idx] = (@m_buf[@m_write_off + idx] & mask) | upperbits
+      @m_buf[@m_write_off + idx + 1] = lowerbits
+      idx += 1
+    end
+
+    @m_write_off += idx
   end
-      
+
+  # Stores a NULL-terminated C-style string in the bit stream
+  # buffer. It includes the NULL terminator.      
   def store_string_with_debug_info(str)
-    raise NotImplementedError.new()
+    store_bits(3, BS_STRING)
+    str_len = 0
+
+    if str
+      str_len = str.length
+    end
+
+    store_packed_bits(5, str_len)
+    store_string(str)
   end
 
-  def get_bits(nBits)
-    raise NotImplementedError.new()
+  def get_bits(nbits)
+    target = nil
+
+    if nbits > get_readable_bits()
+      return false
+    end
+
+    if is_byte_aligned()
+      nbits = BYTE_ALIGN(nbits)
+    end
+
+    target = u_get_bits(nbits)
+    return target
   end
 
-  def u_get_bits(nBits)
-    raise NotImplementedError.new()
+  def u_get_bits(nbits)
+    r = nil
+    tp = nil
+    target = nil
+    raise "nbits is < 0 or > 32!" unless (nbits > 0) && nbits <= 32
+    raise "get_readable_bits() returned < nbits!" unless get_readable_bits() >= nbits
+    raise "m_read_off + 7 is > (m_size + m_safe_area)!" unless @m_read_off + 7 < (@m_size + @m_safe_area)
+    nbits = ((nbits - 1) &0x1F) + 1 # ensure the nbits range is 1 - 32
+    tp = read_ptr()
+    r = tp
+    r >>= @m_read_bit_off             # starting at the top
+    target = r & (~1) >> (64 - nbits)
+    read_ptr((@m_read_bit_off + nbits) >> 3)
+    @m_read_bit_off = (@m_read_bit_off + nbits) & 0x7
+    return target
   end
 
-  def get_bits_with_debug_info(nBits)
-    raise NotImplementedError.new()
+  def get_bits_with_debug_info(nbits)
+    if GetBits(3) != BS_BITS
+      return 0
+    end
+    get_packed_bits(5)
+    return get_bits(nbits)
   end
 
   def get_packed_bits(min_bits)
@@ -146,12 +288,13 @@ class BitStream < GrowingBuffer
     end
 
     str = ""
-    bits_left = BITS_LEFT(m_read_bit_off)
+    bits_left = BITS_LEFT(@m_read_bit_off)
     chr = nil
 
     begin
-      chr = @m_buf[@m_read_off] >> @m_read_bit_off # will need to look at this line and the one below since ruby
-      chr |= @m_buf[++@m_read_off] << bitsLeft    # lacks support for the prefix operator and verify syntax of []
+      chr = @m_buf[@m_read_off] >> @m_read_bit_off
+      @m_read_off += 1
+      chr |= @m_buf[@m_read_off] << bitsLeft
 
       if chr
         str += chr
@@ -207,7 +350,7 @@ class BitStream < GrowingBuffer
   end
 
   def get_writable_bits()
-    return (get_avail_size() << 3) - @m_write_bit_off
+    return ((get_avail_size() << 3) - @m_write_bit_off)
   end
 
   def get_readable_bits()
@@ -215,7 +358,8 @@ class BitStream < GrowingBuffer
   end
 
   def get_avail_size()
-    res = (@m_size - @m_write_off) - (@m_write_bit_off != 0)
+    res = (@m_size - @m_write_off)
+    res -= 1 if (@m_write_bit_off != 0)
     return [0, res].max
   end
 
@@ -287,7 +431,7 @@ class BitStream < GrowingBuffer
     # If this stream is byte aligned, then we'll need to use a byte-aligned
     # value for nbits
     num_bits = is_byte_aligned() ? byte_align(nbits) : nbits
-    raise "numbits is less than #{BITS_PER_DWORD}" unless num_bits <= BITS_PER_DWORD
+    raise "numbits is less than #{BITS_PER_DWORD}!" unless num_bits <= BITS_PER_DWORD
 
     bits_added = 0
     bits = 0
