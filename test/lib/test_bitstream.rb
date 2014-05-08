@@ -32,4 +32,21 @@ class TestBitStream < Test::Unit::TestCase
     bs.store_packed_bits(3, 11)
     assert_equal(bs.get_packed_bits(3), 11)
   end
+  def test_string
+    bs = BitStream.new("")    
+    bs.store_string("Strings of Destiny!")
+    assert_equal(bs.get_string(), "Strings of Destiny!")
+  end
+  def test_mixed_stores
+    bs = BitStream.new("")
+    bs.store_packed_bits(3, 5)
+    bs.store_bits(3, 4)
+    bs.store_string("Test me baby one more time")
+    payload = [87].pack("c*")
+    bs.store_bit_array(payload, payload.size*8)
+    assert_equal(bs.get_packed_bits(3), 5)
+    assert_equal(bs.get_bits(3), 4)
+    assert_equal(bs.get_string(), "Test me baby one more time")
+    assert_equal(bs.get_bit_array(payload.size*8),payload)
+  end
 end
