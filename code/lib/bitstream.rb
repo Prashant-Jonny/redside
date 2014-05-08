@@ -159,10 +159,9 @@ public
       put_string(str)
       return
     end
-
-    len = str.length + 1
+    str+= "\0" if not str.end_with?("\0") # add C string marker
+    len = str.length
     rshift = 8 - @m_write_bit_off
-
     if len > get_avail_size()
       if resize(@m_write_off + len) == -1 # space exhausted
         @m_last_err = 1
@@ -172,11 +171,11 @@ public
 
     idx = 0
     while idx < len do
-      upperbits = str[idx] << @m_write_bit_off
-      lowerbits = str[idx] >> rshift
+      upperbits = str[idx].ord << @m_write_bit_off
+      lowerbits = str[idx].ord >> rshift
       mask = (0xFF >> rshift)
-      @m_buf[@m_write_off + idx] = (@m_buf[@m_write_off + idx] & mask) | upperbits
-      @m_buf[@m_write_off + idx + 1] = lowerbits
+      @m_buf[@m_write_off + idx] = (0xFF&((@m_buf[@m_write_off + idx].ord & mask) | upperbits)).chr
+      @m_buf[@m_write_off + idx + 1] = lowerbits.chr
       idx += 1
     end
 
@@ -276,7 +275,7 @@ public
   def get_bit_array(target, nbits)
     byte_align(true, false)
     nbytes(nbits >> 3)
-    get_bytes(target, nbytes)
+    return get_bytes(nbytes)
   end
 
   # Retrieves a client-specified "array" of bits.  The main difference between
@@ -289,9 +288,17 @@ public
     get_packed_bits(5)
     get_bit_array(array, nbytes)
   end
+private
+def BITS_TO_BYTES(x) 
+  ((x + 7) >> 3)
+end
+def BITS_LEFT(x)
+  (BITS_PER_BYTE - (x))
+end
 
+public
   # Retrieves a null-terminated C-style string from the bit stream
-  def get_string(str)
+  def get_string()
     if get_readable_bits() < 8
       @m_last_err = 1
       return
@@ -299,22 +306,22 @@ public
 
     str = ""
     bits_left = BITS_LEFT(@m_read_bit_off)
-    chr = nil
+    char = nil
 
     begin
-      chr = @m_buf[@m_read_off] >> @m_read_bit_off
+      char = @m_buf[@m_read_off].ord >> @m_read_bit_off
       @m_read_off += 1
-      chr |= @m_buf[@m_read_off] << bitsLeft
-
-      if chr
-        str += chr
+      char |= @m_buf[@m_read_off].ord << bits_left
+      char = char &0xFF
+      if char
+        str += char.chr
       end
-
-      if chr != '\0' && get_readable_bits() < 8
+      if char != 0 && get_readable_bits() < 8
         @m_last_err = 1
-        return
+        return ""
       end
-    end while chr != '\0'
+    end while char != 0
+    return str.chomp("\0")
   end
 
   # Retrieves a null-terminated C-style string from the bit stream
