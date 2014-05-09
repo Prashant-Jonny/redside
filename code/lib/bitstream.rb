@@ -126,10 +126,10 @@ public
   # is that store_bit_array can accept more than 32 bits at a time.
   def store_bit_array(array, nbits)
     nbytes = BITS_TO_BYTES(nbits)
-    raise "src is undefined!" unless src
+    raise "src is undefined!" unless array
     byte_align()
-    put_bytes(src, nbytes)
-    @m_buf[@m_write_off] = 0
+    put_bytes(array, nbytes)
+    @m_buf[@m_write_off] = "\0"
 
     if nbits & 7 # unaligned !
       @m_write_off -= 1
@@ -289,12 +289,12 @@ public
     get_bit_array(array, nbytes)
   end
 private
-def BITS_TO_BYTES(x) 
-  ((x + 7) >> 3)
-end
-def BITS_LEFT(x)
-  (BITS_PER_BYTE - (x))
-end
+  def BITS_TO_BYTES(x) 
+    ((x + 7) >> 3)
+  end
+  def BITS_LEFT(x)
+    (BITS_PER_BYTE - (x))
+  end
 
 public
   # Retrieves a null-terminated C-style string from the bit stream

@@ -80,5 +80,7 @@ class GrowingBuffer
   def read_ptr(v)
     @m_read_off += v
   end
-
+  def put_bytes(bytes,count)
+    
+  end
 end
