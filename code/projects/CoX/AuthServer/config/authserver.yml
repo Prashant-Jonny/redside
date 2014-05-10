@@ -12,8 +12,8 @@ listen_port: 2106
 #   event - uses EventMachine if available
 # JRuby is recommended if using "thread"
 # "select" or "event" is recommended otherwise
-# Note: Only "thread" is supported at the moment
-io_type: thread
+# Note: Only "select" and "thread" are supported at the moment
+io_type: select
 
 # Set this option to "true" to enable debugging or
 # "false" to disable debugging.

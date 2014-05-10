@@ -11,12 +11,19 @@ end
 # Load library path
 $LOAD_PATH << "../../../lib"
 
-require 'config'
 require 'log'
 require 'segs'
+require_relative 'network'
+require_relative 'options'
 
 puts "#{SEGS::VERSION}"
 puts "#{SEGS::RELEASE}"
 puts "#{SEGS::URL}\n\n"
 puts "Starting AuthServer..."
-Log.write "authserver.log", "Starting AuthServer..."
+Log.write(0, "authserver.log", "Starting AuthServer...")
+puts "Parsing authserver.yml..."
+Log.write(0, "authserver.log", "Parsing authserver.yml...")
+Options.parse("config/authserver.yml")
+puts "Initializing network..."
+Log.write(0, "authserver.log", "Initializing network...")
+Network.start()

@@ -5,9 +5,8 @@
 
 require 'yaml'
 
-class Config
-  @@listen_address
-  @@listen_port
-  @@io_type
-  @@debug_mode  
+class AbstractOptions
+  def parse(options_file)
+    raise "I am abstract... Override me!"
+  end
 end

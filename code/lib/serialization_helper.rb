@@ -33,8 +33,8 @@ class StringIO
 
   def readCstring
     res=""
-    while (c=self.getc)!=0
-      res+=c.chr
+    while (c = self.getc) != 0
+      res += c.chr
     end
     res
   end
