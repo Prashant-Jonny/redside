@@ -17,11 +17,11 @@ class BitStream < GrowingBuffer
   end
 
   def max_value_that_can_be_stored(x)
-    (1 << x) - 1
+    ((1 << x) - 1)&0xFFFFFFFF
   end
 
   def n_ones(n)
-    (1 << n) - 1
+    ((1 << n) - 1)&0xFFFFFFFF
   end
 
   # Stores a client-specified number of bits into the bit-stream buffer.
@@ -42,7 +42,7 @@ class BitStream < GrowingBuffer
     #  value for nbits.
     if is_byte_aligned()
       if num_bits # mask out non-needed
-        data_bits &= (1 << num_bits) - 1
+        data_bits &= n_ones(num_bits)
       end
       num_bits = BYTE_ALIGN(num_bits)
     end
@@ -132,7 +132,6 @@ public
     @m_buf[@m_write_off] = "\0"
 
     if nbits & 7 # unaligned !
-      @m_write_off -= 1
       @m_write_bit_off = nbits & 7
     end
   end
@@ -168,7 +167,6 @@ public
         return
       end
     end
-
     idx = 0
     while idx < len do
       upperbits = str[idx].ord << @m_write_bit_off
@@ -178,7 +176,6 @@ public
       @m_buf[@m_write_off + idx + 1] = lowerbits.chr
       idx += 1
     end
-
     @m_write_off += idx
   end
 
@@ -222,7 +219,7 @@ public
     tp = read_8bytes_at_point(@m_read_off)
     r = tp
     r >>= @m_read_bit_off             # starting at the top
-    target = r & (~1) >> (64 - nbits)
+    target = r & (((~1)&0xFFFFFFFFFFFFFFFF) >> (64 - nbits))
     read_ptr((@m_read_bit_off + nbits) >> 3)
     @m_read_bit_off = (@m_read_bit_off + nbits) & 0x7
     return target
@@ -272,9 +269,9 @@ public
   # Retrieves a client-specified "array" of bits.  The main difference between 
   # this function and get_bits() is that this one can potentially retrieve more
   # than 32 bits.
-  def get_bit_array(target, nbits)
+  def get_bit_array(nbits)
     byte_align(true, false)
-    nbytes(nbits >> 3)
+    nbytes = BITS_TO_BYTES(nbits)
     return get_bytes(nbytes)
   end
 
@@ -286,7 +283,7 @@ public
       return
     end
     get_packed_bits(5)
-    get_bit_array(array, nbytes)
+    get_bit_array(nbytes)
   end
 private
   def BITS_TO_BYTES(x) 
@@ -300,7 +297,7 @@ public
   # Retrieves a null-terminated C-style string from the bit stream
   def get_string()
     if get_readable_bits() < 8
-      @m_last_err = 1
+      raise "Error during get_string"
       return
     end
 
@@ -317,7 +314,7 @@ public
         str += char.chr
       end
       if char != 0 && get_readable_bits() < 8
-        @m_last_err = 1
+        raise "Error during get_string"
         return ""
       end
     end while char != 0

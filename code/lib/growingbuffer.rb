@@ -81,6 +81,15 @@ class GrowingBuffer
     @m_read_off += v
   end
   def put_bytes(bytes,count)
+    raise ArgumentError.new("Bad argument for put_bytes") if(bytes.to_s.bytesize!=count)
+    @m_buf = @m_buf[0..@m_write_off-1] + bytes
+    @m_write_off+=count
     
+  end
+  def get_bytes(count)
+    raise ArgumentError.new("Bad argument for get_bytes") if(@m_buf.bytesize<@m_read_off+count)
+    res = @m_buf[@m_read_off..@m_read_off+count-1]
+    @m_read_off+=count
+    res
   end
 end
